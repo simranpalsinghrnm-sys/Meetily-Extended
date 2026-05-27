@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::server::BridgeState;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MeetingPushPayload {
     pub meeting_id: String,
     pub title: String,
@@ -14,7 +14,7 @@ pub struct MeetingPushPayload {
     pub action_items: Vec<ActionItemPush>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ActionItemPush {
     pub title: String,
     pub details: Option<String>,

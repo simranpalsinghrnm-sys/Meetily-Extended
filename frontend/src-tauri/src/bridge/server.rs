@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -6,8 +5,6 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use tokio::net::TcpListener;
 use tokio::sync::Mutex;
-
-use crate::projects::repo::ProjectsRepo;
 
 #[derive(Clone)]
 pub struct BridgeConfig {
@@ -311,6 +308,3 @@ async fn list_meetings_payload(
     Ok(out)
 }
 
-// Avoid dead-code warnings for the urlencoding_decode helper if never called in tests.
-#[allow(dead_code)]
-fn _unused(_: Infallible) {}

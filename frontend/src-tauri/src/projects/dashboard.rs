@@ -87,8 +87,8 @@ pub async fn project_dashboard(
         .ok_or_else(|| "project not found".to_string())?;
     let meetings = load_meetings(pool, project_id).await.map_err(|e| e.to_string())?;
     let open_action_items = load_open_actions(pool, project_id).await.map_err(|e| e.to_string())?;
-    let member_count: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM project_members WHERE project_id = ?")
+    let member_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM project_members WHERE project_id = ?")
             .bind(project_id)
             .fetch_one(pool)
             .await
@@ -97,6 +97,6 @@ pub async fn project_dashboard(
         project,
         meetings,
         open_action_items,
-        member_count: member_count.0,
+        member_count,
     })
 }
