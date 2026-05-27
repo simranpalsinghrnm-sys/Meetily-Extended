@@ -575,8 +575,11 @@ jobs:
           APPLE_ID_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_ID_PASSWORD || '' }}
           APPLE_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ inputs.sign-binaries && secrets.APPLE_TEAM_ID || '' }}
-          APPLE_CERTIFICATE: ${{ inputs.sign-binaries && secrets.APPLE_CERTIFICATE || '' }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ inputs.sign-binaries && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          # APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD removed:
+          # empty-string env vars trigger Tauri's `security import` path
+          # even when sign-binaries is false. When signing IS enabled, the
+          # earlier "Import Apple Developer Certificate" step already loads
+          # the cert into the keychain, so tauri-action doesn't need these.
           APPLE_SIGNING_IDENTITY: ${{ inputs.sign-binaries && env.CERT_ID || '' }}
           # Tauri updater signing (ALWAYS enabled for .sig files)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
