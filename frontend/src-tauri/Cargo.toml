@@ -1,6 +1,6 @@
 [package]
 name = "meetily-extended"
-version = "1.0.0-extended.0"
+version = "1.0.0"
 description = "Meetily Extended — auto-detected meetings, Company/Project segregation, ToolMySelf bridge"
 authors = ["Simranpal Singh <simranpalsingh.rnm@gmail.com>"]
 license = "MIT"
