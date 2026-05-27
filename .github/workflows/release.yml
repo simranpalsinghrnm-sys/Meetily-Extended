@@ -26,65 +26,49 @@ jobs:
         with:
           fetch-depth: 0  # Fetch all tags
 
-      - name: Get version from tauri.conf.json and check for existing tags
+      - name: Get version
         id: get-version
         shell: bash
         run: |
-          BASE_VERSION=$(grep -o '"version": "[^"]*"' frontend/src-tauri/tauri.conf.json | cut -d'"' -f4)
-          echo "Base version from tauri.conf.json: $BASE_VERSION"
-
-          # Fetch all tags
-          git fetch --tags
-
-          # Check if base version tag exists
-          if git tag -l "v${BASE_VERSION}" | grep -q .; then
-            echo "Tag v${BASE_VERSION} already exists, looking for minor updates..."
-
-            # Find all existing minor versions (e.g., 0.1.1.1, 0.1.1.2, etc.)
-            LATEST_MINOR=0
-            for i in $(seq 1 100); do
-              if git tag -l "v${BASE_VERSION}.${i}" | grep -q .; then
-                LATEST_MINOR=$i
-              else
-                break
-              fi
-            done
-
-            # Increment to next minor version
-            NEXT_MINOR=$((LATEST_MINOR + 1))
-
-            if [ $NEXT_MINOR -gt 100 ]; then
-              echo "ERROR: Maximum minor version (100) reached for ${BASE_VERSION}"
-              echo "Please update the version in tauri.conf.json"
-              exit 1
-            fi
-
-            VERSION="${BASE_VERSION}.${NEXT_MINOR}"
-            echo "Using minor update version: $VERSION"
+          set +e
+          # Prefer the pushed tag name when triggered by tag push; otherwise read tauri.conf.json
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            echo "Using pushed tag version: $VERSION"
           else
-            VERSION="${BASE_VERSION}"
-            echo "Using base version: $VERSION"
+            VERSION=$(grep -o '"version": "[^"]*"' frontend/src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+            echo "Using tauri.conf.json version: $VERSION"
           fi
-
-          echo "Final version: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Create Draft Release
+      - name: Create or get Draft Release
         id: create-release
         uses: actions/github-script@v7
         with:
           script: |
+            const tag = `v${{ steps.get-version.outputs.version }}`;
+            try {
+              const { data: existing } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              console.log(`Reusing existing release ${existing.id}`);
+              return existing.id;
+            } catch (e) {
+              if (e.status !== 404) throw e;
+            }
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: `v${{ steps.get-version.outputs.version }}`,
-              name: `Meetily v${{ steps.get-version.outputs.version }}`,
+              tag_name: tag,
+              name: `Meetily Extended ${tag}`,
               draft: true,
-              prerelease: false,
-              generate_release_notes: true
-            })
-            console.log(`Created draft release with ID: ${data.id}`)
-            return data.id
+              prerelease: true,
+              generate_release_notes: true,
+            });
+            console.log(`Created draft release with ID: ${data.id}`);
+            return data.id;
 
   # STEP 2: Build all platforms and upload directly to release
   # Note: Linux builds are excluded from release (only macOS and Windows)
