@@ -72,7 +72,7 @@ export function SidebarTree({ activeProjectId }: Props) {
                   {items.map(p => (
                     <Link
                       key={p.id}
-                      href={`/projects/${p.id}`}
+                      href={`/projects?id=${p.id}`}
                       className={`flex items-center gap-2 rounded-md px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
                         activeProjectId === p.id ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : ''
                       }`}

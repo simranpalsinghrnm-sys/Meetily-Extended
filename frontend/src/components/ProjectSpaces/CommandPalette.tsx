@@ -40,7 +40,7 @@ export function CommandPalette() {
         hint: company?.name ?? '',
         onSelect: () => {
           setOpen(false);
-          router.push(`/projects/${p.id}`);
+          router.push(`/projects?id=${p.id}`);
         },
       };
     });
