@@ -94,7 +94,8 @@ jobs:
       build-args: ${{ matrix.args }}
       sign-binaries: false
       asset-prefix: "meetily"
-      upload-artifacts: false  # tauri-action uploads directly to release
+      upload-artifacts: true  # also stash in Actions artifacts as fallback
+      asset-prefix: meetily-extended
       release-id: ${{ needs.create-release.outputs.release-id }}
     secrets: inherit
 
