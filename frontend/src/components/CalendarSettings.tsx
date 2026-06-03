@@ -5,13 +5,14 @@ import { GoogleCalendarProvider, setClientCreds } from '@/calendar/google';
 import { useCalendar } from '@/calendar/CalendarProvider';
 
 export function CalendarSettings() {
-  const { isAnyAuthed, refreshAuthState } = useCalendar();
+  const { isAnyAuthed, refreshAuthState, watcher, testPrompt } = useCalendar();
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [savedCreds, setSavedCreds] = useState(false);
   const [device, setDevice] = useState<{ verificationUrl: string; userCode: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<string | null>(null);
 
   useEffect(() => {
     refreshAuthState();
@@ -58,13 +59,23 @@ export function CalendarSettings() {
     }
   };
 
+  const runTest = async () => {
+    setTestResult(null);
+    try {
+      const r = await testPrompt();
+      setTestResult(`Prompt fired. You chose: ${r}`);
+    } catch (e) {
+      setTestResult(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   return (
     <div className="space-y-6 p-4">
       <header>
         <h2 className="text-lg font-semibold">Google Calendar</h2>
         <p className="text-sm text-zinc-500">
-          Meetily Extended watches your calendar and prompts you ~1 minute before each meeting.
-          Recording starts only when you click Record. Nothing is sent to Google beyond reading your events.
+          Polls every 30s. Pops a Record / Skip / Snooze dialog 3 minutes before any meeting (event with a video link or attendees).
+          Re-prompts at T-30s if first one was dismissed.
         </p>
         <a
           href="https://github.com/simranpalsinghrnm-sys/Meetily-Extended/blob/main/docs/calendar-setup.md"
@@ -81,6 +92,40 @@ export function CalendarSettings() {
           {error}
         </div>
       )}
+
+      <section className="space-y-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Watcher status</h3>
+        {watcher ? (
+          <ul className="space-y-1 text-sm">
+            <li>
+              Last poll: {watcher.lastPollAt ? new Date(watcher.lastPollAt).toLocaleTimeString() : '— not yet —'}
+            </li>
+            <li>Upcoming events (next 15 min): {watcher.upcoming.length}</li>
+            <li>Likely meetings among them: {watcher.upcoming.filter(e => e.isMeeting).length}</li>
+            {watcher.lastError && (
+              <li className="text-red-600">Last error: {watcher.lastError}</li>
+            )}
+          </ul>
+        ) : (
+          <p className="text-sm text-zinc-500">Initializing…</p>
+        )}
+
+        {watcher && watcher.upcoming.length > 0 && (
+          <ul className="mt-2 space-y-1 border-t border-zinc-200 pt-2 text-xs dark:border-zinc-800">
+            {watcher.upcoming.slice(0, 5).map(e => {
+              const min = Math.round((new Date(e.startsAt).getTime() - Date.now()) / 60_000);
+              return (
+                <li key={e.id} className="flex items-center justify-between">
+                  <span className={e.isMeeting ? 'font-medium' : 'text-zinc-500'}>
+                    {e.isMeeting ? '🔔' : '·'} {e.title}
+                  </span>
+                  <span className="text-zinc-500">in {min}m</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="space-y-2">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">OAuth client</h3>
@@ -118,12 +163,21 @@ export function CalendarSettings() {
             <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
               ✓ Connected to Google Calendar
             </div>
-            <button
-              onClick={disconnect}
-              className="rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-            >
-              Disconnect
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={runTest}
+                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Test meeting prompt
+              </button>
+              <button
+                onClick={disconnect}
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Disconnect
+              </button>
+            </div>
+            {testResult && <p className="text-sm text-zinc-500">{testResult}</p>}
           </div>
         ) : (
           <button
@@ -138,11 +192,21 @@ export function CalendarSettings() {
         {device && (
           <div className="space-y-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm dark:border-blue-900 dark:bg-blue-950">
             <div>
-              1. Open <a href={device.verificationUrl} target="_blank" rel="noreferrer" className="font-medium text-blue-700 underline dark:text-blue-300">{device.verificationUrl}</a>
+              1. Open{' '}
+              <a
+                href={device.verificationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-blue-700 underline dark:text-blue-300"
+              >
+                {device.verificationUrl}
+              </a>
             </div>
             <div>
               2. Enter code:{' '}
-              <code className="rounded bg-white px-2 py-1 font-mono text-base dark:bg-zinc-900">{device.userCode}</code>
+              <code className="rounded bg-white px-2 py-1 font-mono text-base dark:bg-zinc-900">
+                {device.userCode}
+              </code>
             </div>
             <div className="text-xs text-zinc-500">Approve in the browser. This dialog auto-closes when done.</div>
           </div>

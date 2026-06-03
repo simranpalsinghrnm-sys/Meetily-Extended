@@ -1,12 +1,14 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarManager, PROVIDERS } from './manager';
-import type { CalendarEvent } from './types';
+import { CalendarManager, PROVIDERS, type WatcherState } from './manager';
+import type { CalendarEvent, MeetingPromptDecision } from './types';
 
 type CalendarCtx = {
   isAnyAuthed: boolean;
   refreshAuthState: () => Promise<void>;
+  watcher: WatcherState | null;
+  testPrompt: () => Promise<MeetingPromptDecision>;
 };
 
 const Ctx = createContext<CalendarCtx | null>(null);
@@ -19,6 +21,7 @@ type Props = {
 export function CalendarProvider({ children, onPromptRecord }: Props) {
   const managerRef = useRef<CalendarManager | null>(null);
   const [isAnyAuthed, setIsAnyAuthed] = useState(false);
+  const [watcher, setWatcher] = useState<WatcherState | null>(null);
 
   const refreshAuthState = useMemo(
     () => async () => {
@@ -29,7 +32,10 @@ export function CalendarProvider({ children, onPromptRecord }: Props) {
   );
 
   useEffect(() => {
-    const m = new CalendarManager({ onPromptRecord });
+    const m = new CalendarManager({
+      onPromptRecord,
+      onStateChange: state => setWatcher(state),
+    });
     managerRef.current = m;
     refreshAuthState();
     m.start().catch(err => console.error('[calendar] start failed', err));
@@ -39,7 +45,18 @@ export function CalendarProvider({ children, onPromptRecord }: Props) {
     };
   }, [onPromptRecord, refreshAuthState]);
 
-  const value = useMemo<CalendarCtx>(() => ({ isAnyAuthed, refreshAuthState }), [isAnyAuthed, refreshAuthState]);
+  const testPrompt = useMemo(
+    () => async () => {
+      if (!managerRef.current) throw new Error('Calendar manager not initialized');
+      return await managerRef.current.testPrompt();
+    },
+    []
+  );
+
+  const value = useMemo<CalendarCtx>(
+    () => ({ isAnyAuthed, refreshAuthState, watcher, testPrompt }),
+    [isAnyAuthed, refreshAuthState, watcher, testPrompt]
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
