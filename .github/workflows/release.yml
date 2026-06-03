@@ -93,9 +93,8 @@ jobs:
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
       sign-binaries: false
-      asset-prefix: "meetily"
-      upload-artifacts: true  # also stash in Actions artifacts as fallback
       asset-prefix: meetily-extended
+      upload-artifacts: true
       release-id: ${{ needs.create-release.outputs.release-id }}
     secrets: inherit
 
