@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { GoogleCalendarProvider, setClientCreds } from '@/calendar/google';
+import { GoogleCalendarProvider, setClientCreds, listGoogleAccounts, removeGoogleAccount } from '@/calendar/google';
 import { useCalendar } from '@/calendar/CalendarProvider';
 
 export function CalendarSettings() {
@@ -13,9 +13,19 @@ export function CalendarSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [accounts, setAccounts] = useState<{ id: string; email: string }[]>([]);
+
+  const reloadAccounts = async () => {
+    try {
+      setAccounts(await listGoogleAccounts());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
 
   useEffect(() => {
     refreshAuthState();
+    reloadAccounts();
   }, [refreshAuthState]);
 
   const saveCreds = async () => {
@@ -41,6 +51,7 @@ export function CalendarSettings() {
       await GoogleCalendarProvider.completeAuth();
       setDevice(null);
       await refreshAuthState();
+      await reloadAccounts();
     } catch (e) {
       setError(String(e));
       setDevice(null);
@@ -49,11 +60,23 @@ export function CalendarSettings() {
     }
   };
 
-  const disconnect = async () => {
+  const disconnectAll = async () => {
     setError(null);
     try {
       await GoogleCalendarProvider.signOut();
       await refreshAuthState();
+      await reloadAccounts();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const removeOne = async (email: string) => {
+    setError(null);
+    try {
+      await removeGoogleAccount(email);
+      await refreshAuthState();
+      await reloadAccounts();
     } catch (e) {
       setError(String(e));
     }
@@ -158,36 +181,54 @@ export function CalendarSettings() {
 
       <section className="space-y-3">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-500">Connection</h3>
-        {isAnyAuthed ? (
-          <div className="space-y-2">
-            <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950 dark:text-green-300">
-              ✓ Connected to Google Calendar
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={runTest}
-                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        {accounts.length > 0 && (
+          <ul className="space-y-1 rounded-md border border-zinc-200 p-2 dark:border-zinc-800">
+            {accounts.map(a => (
+              <li
+                key={a.id}
+                className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-900"
               >
-                Test meeting prompt
-              </button>
-              <button
-                onClick={disconnect}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
-              >
-                Disconnect
-              </button>
-            </div>
-            {testResult && <p className="text-sm text-zinc-500">{testResult}</p>}
-          </div>
-        ) : (
+                <span className="flex items-center gap-2">
+                  <span className="text-green-600">●</span>
+                  <span>{a.email}</span>
+                </span>
+                <button
+                  onClick={() => removeOne(a.email)}
+                  className="text-xs text-zinc-500 hover:text-red-600"
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex gap-2">
           <button
             onClick={connect}
             disabled={busy}
             className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            {busy ? 'Waiting for approval…' : 'Connect Google Calendar'}
+            {busy ? 'Waiting for approval…' : accounts.length === 0 ? 'Connect Google Calendar' : '+ Add another account'}
           </button>
-        )}
+          {isAnyAuthed && (
+            <>
+              <button
+                onClick={runTest}
+                className="rounded-md border border-blue-300 bg-white px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-zinc-900 dark:text-blue-300 dark:hover:bg-zinc-800"
+              >
+                Test prompt
+              </button>
+              <button
+                onClick={disconnectAll}
+                className="rounded-md border border-zinc-300 px-3 py-2 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              >
+                Disconnect all
+              </button>
+            </>
+          )}
+        </div>
+        {testResult && <p className="text-sm text-zinc-500">{testResult}</p>}
 
         {device && (
           <div className="space-y-2 rounded-md border border-blue-300 bg-blue-50 p-3 text-sm dark:border-blue-900 dark:bg-blue-950">

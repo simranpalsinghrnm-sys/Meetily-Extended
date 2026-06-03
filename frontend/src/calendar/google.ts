@@ -10,11 +10,12 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const EVENTS_URL = (calId: string) =>
   `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calId)}/events`;
 
-type StoredAuth = {
+type StoredAccount = {
+  id: string;
   access_token: string;
   refresh_token: string;
   expires_at: number;
-  account_email: string;
+  email: string;
 };
 
 type DeviceCodeResponse = {
@@ -34,7 +35,8 @@ type TokenResponse = {
 };
 
 const STORE_PATH = '.meetily-extended.calendar.json';
-const STORE_KEY = 'google.auth';
+const ACCOUNTS_KEY = 'google.accounts';
+const LEGACY_AUTH_KEY = 'google.auth';
 
 let pendingDevice: { code: DeviceCodeResponse; startedAt: number } | null = null;
 
@@ -42,25 +44,46 @@ async function store(): Promise<Store> {
   return await Store.load(STORE_PATH);
 }
 
-async function loadAuth(): Promise<StoredAuth | null> {
+async function loadAccounts(): Promise<StoredAccount[]> {
   const s = await store();
-  return (await s.get<StoredAuth>(STORE_KEY)) ?? null;
+  const arr = (await s.get<StoredAccount[]>(ACCOUNTS_KEY)) ?? null;
+  if (arr && Array.isArray(arr)) return arr;
+
+  // Legacy single-account migration
+  type LegacyAuth = { access_token: string; refresh_token: string; expires_at: number; account_email: string };
+  const legacy = (await s.get<LegacyAuth>(LEGACY_AUTH_KEY)) ?? null;
+  if (legacy?.access_token) {
+    const migrated: StoredAccount = {
+      id: legacy.account_email || 'legacy',
+      access_token: legacy.access_token,
+      refresh_token: legacy.refresh_token,
+      expires_at: legacy.expires_at,
+      email: legacy.account_email || 'unknown',
+    };
+    await s.set(ACCOUNTS_KEY, [migrated]);
+    await s.delete(LEGACY_AUTH_KEY);
+    await s.save();
+    return [migrated];
+  }
+  return [];
 }
 
-async function saveAuth(auth: StoredAuth): Promise<void> {
+async function saveAccounts(accounts: StoredAccount[]): Promise<void> {
   const s = await store();
-  await s.set(STORE_KEY, auth);
+  await s.set(ACCOUNTS_KEY, accounts);
   await s.save();
 }
 
-async function clearAuth(): Promise<void> {
-  const s = await store();
-  await s.delete(STORE_KEY);
-  await s.save();
+async function upsertAccount(account: StoredAccount): Promise<void> {
+  const list = await loadAccounts();
+  const idx = list.findIndex(a => a.email.toLowerCase() === account.email.toLowerCase());
+  if (idx >= 0) list[idx] = account;
+  else list.push(account);
+  await saveAccounts(list);
 }
 
 async function getClientCreds(): Promise<{ client_id: string; client_secret: string }> {
-  const s = await Store.load('.meetily-extended.calendar.json');
+  const s = await store();
   const creds = await s.get<{ client_id: string; client_secret: string }>('google.client');
   if (!creds?.client_id || !creds?.client_secret) {
     throw new Error('Google OAuth client not configured. Open Settings → Calendar.');
@@ -74,13 +97,13 @@ export async function setClientCreds(client_id: string, client_secret: string): 
   await s.save();
 }
 
-async function refreshIfNeeded(auth: StoredAuth): Promise<StoredAuth> {
-  if (auth.expires_at - 60_000 > Date.now()) return auth;
+async function refreshIfNeeded(account: StoredAccount): Promise<StoredAccount> {
+  if (account.expires_at - 60_000 > Date.now()) return account;
   const creds = await getClientCreds();
   const body = new URLSearchParams({
     client_id: creds.client_id,
     client_secret: creds.client_secret,
-    refresh_token: auth.refresh_token,
+    refresh_token: account.refresh_token,
     grant_type: 'refresh_token',
   });
   const res = await tauriFetch(TOKEN_URL, {
@@ -91,14 +114,25 @@ async function refreshIfNeeded(auth: StoredAuth): Promise<StoredAuth> {
   if (!res.ok) throw new Error(`Token refresh failed: ${res.status}`);
   const data = (await res.json()) as TokenResponse;
   if (!data.access_token) throw new Error('No access_token in refresh response');
-  const next: StoredAuth = {
+  const next: StoredAccount = {
+    ...account,
     access_token: data.access_token,
-    refresh_token: data.refresh_token ?? auth.refresh_token,
+    refresh_token: data.refresh_token ?? account.refresh_token,
     expires_at: Date.now() + data.expires_in * 1000,
-    account_email: auth.account_email,
   };
-  await saveAuth(next);
+  await upsertAccount(next);
   return next;
+}
+
+export async function listGoogleAccounts(): Promise<{ id: string; email: string }[]> {
+  const accounts = await loadAccounts();
+  return accounts.map(a => ({ id: a.id, email: a.email }));
+}
+
+export async function removeGoogleAccount(email: string): Promise<void> {
+  const list = await loadAccounts();
+  const next = list.filter(a => a.email.toLowerCase() !== email.toLowerCase());
+  await saveAccounts(next);
 }
 
 export const GoogleCalendarProvider: CalendarProvider = {
@@ -106,7 +140,8 @@ export const GoogleCalendarProvider: CalendarProvider = {
   label: 'Google Calendar',
 
   async isAuthed() {
-    return (await loadAuth()) !== null;
+    const accounts = await loadAccounts();
+    return accounts.length > 0;
   },
 
   async beginAuth() {
@@ -151,12 +186,14 @@ export const GoogleCalendarProvider: CalendarProvider = {
       }
       if (data.access_token) {
         const email = await fetchAccountEmail(data.access_token);
-        await saveAuth({
+        const account: StoredAccount = {
+          id: email,
           access_token: data.access_token,
           refresh_token: data.refresh_token ?? '',
           expires_at: Date.now() + data.expires_in * 1000,
-          account_email: email,
-        });
+          email,
+        };
+        await upsertAccount(account);
         pendingDevice = null;
         return;
       }
@@ -167,28 +204,50 @@ export const GoogleCalendarProvider: CalendarProvider = {
   },
 
   async signOut() {
-    await clearAuth();
+    // Remove ALL accounts on global signOut. Use removeGoogleAccount(email) for targeted removal.
+    await saveAccounts([]);
     pendingDevice = null;
   },
 
   async fetchUpcoming({ fromIso, toIso }) {
-    const auth0 = await loadAuth();
-    if (!auth0) return [];
-    const auth = await refreshIfNeeded(auth0);
-    const params = new URLSearchParams({
-      timeMin: fromIso,
-      timeMax: toIso,
-      singleEvents: 'true',
-      orderBy: 'startTime',
-      maxResults: '50',
+    const accounts = await loadAccounts();
+    if (accounts.length === 0) return [];
+
+    const all: CalendarEvent[] = [];
+    for (const acct0 of accounts) {
+      try {
+        const acct = await refreshIfNeeded(acct0);
+        const params = new URLSearchParams({
+          timeMin: fromIso,
+          timeMax: toIso,
+          singleEvents: 'true',
+          orderBy: 'startTime',
+          maxResults: '50',
+        });
+        const res = await tauriFetch(`${EVENTS_URL('primary')}?${params}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${acct.access_token}` },
+        });
+        if (!res.ok) {
+          console.warn(`[google] ${acct.email}: ${res.status}`);
+          continue;
+        }
+        const data = (await res.json()) as { items?: unknown[] };
+        for (const raw of data.items ?? []) {
+          all.push(normalize(raw, acct.email));
+        }
+      } catch (e) {
+        console.warn(`[google] ${acct0.email} fetch failed`, e);
+      }
+    }
+    // Dedupe by id (rare but possible if same calendar shared across accounts)
+    const seen = new Set<string>();
+    return all.filter(e => {
+      const key = `${e.providerId}:${e.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-    const res = await tauriFetch(`${EVENTS_URL('primary')}?${params}`, {
-      method: 'GET',
-      headers: { Authorization: `Bearer ${auth.access_token}` },
-    });
-    if (!res.ok) throw new Error(`Events fetch failed: ${res.status}`);
-    const data = (await res.json()) as { items?: unknown[] };
-    return (data.items ?? []).map(raw => normalize(raw, auth.account_email));
   },
 };
 
