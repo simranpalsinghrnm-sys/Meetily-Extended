@@ -52,6 +52,33 @@ These were deliberately left as a single follow-up commit so the destructive sur
 
 **No schema changes to ToolMySelf.** The bridge writes only to existing tables: `notes`, `tasks`, `inbox_items`. Constraint in DISCOVERY.md (§stop_and_ask_before) is honored.
 
+## Notion routing (v.16+)
+
+Meetily Extended does NOT integrate with Notion directly. Instead, when ToolMySelf receives a meeting via the bridge (POST to its webhook), it should:
+
+1. Create the Note + Tasks rows (existing behavior in `meetilyBridge.ts`).
+2. If ToolMySelf settings have `notion_auto_sync = true` and `notion_database_id` set, fire its existing Notion sync against that note / those tasks.
+
+Recommended patch to ToolMySelf `meetilyBridge.ts` (inside `ingest()` after `insertActionItems`):
+
+```ts
+if (projectId && getSettings().notion_auto_sync) {
+  try {
+    await notionSyncSingleNote(noteId);
+    await notionSyncProjectTasks(projectId);
+  } catch (e) {
+    console.warn('[meetilyBridge] notion sync failed', e);
+  }
+}
+```
+
+`notionSyncSingleNote` / `notionSyncProjectTasks` already exist in `src/main/notion.ts` (used by manual sync UI). No new Notion auth needed.
+
+This keeps the integration matrix simple:
+- Meetily Extended → ToolMySelf (bridge)
+- ToolMySelf → Notion (existing)
+- Meetily Extended → Notion (never direct)
+
 ## Rollback
 
 Setting `meetily_bridge_enabled = false` stops the webhook receiver. The existing SQLite poller in `src/main/meetilyWatch.ts` continues to work unchanged, so ToolMySelf still picks up Meetily meetings even with the bridge fully off.

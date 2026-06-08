@@ -44,6 +44,7 @@ pub mod database;
 pub mod notifications;
 pub mod projects;
 pub mod bridge;
+pub mod window_watcher;
 pub mod ollama;
 pub mod onboarding;
 pub mod openai;
@@ -503,6 +504,15 @@ pub fn run() {
                 }
             });
 
+            // Meetily Extended: register state + start foreground window watcher
+            _app.manage(window_watcher::commands::WindowWatcherState::default());
+            let watcher_app = _app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = window_watcher::commands::window_watcher_start(watcher_app) {
+                    log::warn!("[window-watcher] failed to start: {}", e);
+                }
+            });
+
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
             if let Ok(resource_path) = _app.handle().path().resource_dir() {
@@ -752,6 +762,10 @@ pub fn run() {
             bridge::commands::bridge_status,
             bridge::commands::bridge_set_config,
             bridge::commands::bridge_push_meeting,
+            // Meetily Extended: foreground window watcher (auto-detect Meet/Zoom/Teams)
+            window_watcher::commands::window_watcher_start,
+            window_watcher::commands::window_watcher_stop,
+            window_watcher::commands::window_watcher_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

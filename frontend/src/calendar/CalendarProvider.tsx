@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarManager, PROVIDERS, type WatcherState } from './manager';
 import type { CalendarEvent, MeetingPromptDecision } from './types';
+import { bindWindowWatcher } from './windowWatcherBridge';
 
 type CalendarCtx = {
   isAnyAuthed: boolean;
@@ -39,9 +40,16 @@ export function CalendarProvider({ children, onPromptRecord }: Props) {
     managerRef.current = m;
     refreshAuthState();
     m.start().catch(err => console.error('[calendar] start failed', err));
+
+    let unlistenWindow: (() => void) | null = null;
+    bindWindowWatcher(onPromptRecord)
+      .then(fn => { unlistenWindow = fn; })
+      .catch(err => console.error('[window-watcher] bind failed', err));
+
     return () => {
       m.stop();
       managerRef.current = null;
+      if (unlistenWindow) unlistenWindow();
     };
   }, [onPromptRecord, refreshAuthState]);
 
