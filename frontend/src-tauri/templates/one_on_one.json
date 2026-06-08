@@ -1,0 +1,32 @@
+{
+  "name": "1:1 (manager / report)",
+  "description": "Granola-style summary for 1:1 meetings — wins, blockers, growth, follow-ups.",
+  "sections": [
+    {
+      "title": "Wins this week",
+      "instruction": "List what the report celebrated, shipped, or made progress on. Quote directly when impactful.",
+      "format": "list"
+    },
+    {
+      "title": "Blockers + asks",
+      "instruction": "List what is blocking the report and what they need from the manager. Be specific about who owns each unblock.",
+      "format": "list"
+    },
+    {
+      "title": "Growth + career",
+      "instruction": "Note any career conversation, skill development, feedback given or received, promotion signals. If none discussed, omit this section.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Action items",
+      "instruction": "Two-column table: Manager owns | Report owns. Each row a concrete next step with a due date if mentioned.",
+      "format": "list",
+      "item_format": "| **Owner** | Task | Due |\n| --- | --- | --- |"
+    },
+    {
+      "title": "Topics for next 1:1",
+      "instruction": "Bullet anything deferred or worth raising next time.",
+      "format": "list"
+    }
+  ]
+}

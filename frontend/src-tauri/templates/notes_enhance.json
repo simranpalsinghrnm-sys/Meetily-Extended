@@ -1,0 +1,16 @@
+{
+  "name": "Enhance my notes (Granola-style)",
+  "description": "Takes the rough notes you typed during the meeting and polishes them using the transcript as context. Preserves YOUR structure and voice — only expands, corrects, and adds missing facts.",
+  "sections": [
+    {
+      "title": "Polished notes",
+      "instruction": "You will receive (a) the user's raw notes typed during the meeting at the top of the transcript context, and (b) the full transcript. Produce a cleaned-up version of the user's notes that: (1) keeps the user's structure, ordering, and voice; (2) corrects factual errors using the transcript; (3) fills in gaps the user clearly meant to capture but ran out of time on; (4) adds direct quotes from the transcript where the user noted something significant; (5) NEVER invents content not present in the transcript or notes; (6) outputs valid markdown. Do not summarize unless the user's notes were already a summary. Do not add headings the user didn't have. This is THEIR doc, polished.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Things I noticed you missed",
+      "instruction": "Bullet list of significant moments from the transcript that the user did NOT capture in their notes. Useful additions only — skip filler. Up to 5 bullets. If notes already covered everything important, write 'Notes were comprehensive.'",
+      "format": "list"
+    }
+  ]
+}

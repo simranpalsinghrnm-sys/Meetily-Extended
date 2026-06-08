@@ -1,0 +1,21 @@
+{
+  "name": "Recap email draft",
+  "description": "Generates a ready-to-send recap email summarizing the meeting. Paste into your email client.",
+  "sections": [
+    {
+      "title": "Subject line",
+      "instruction": "One line. Format: 'Recap: <meeting topic> — <date>'. Keep under 60 chars.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Email body",
+      "instruction": "Write a complete recap email body in first person plural ('we'). Open with thanks for the time. Then 3 sections: 'What we discussed' (3-5 bullets), 'Decisions made' (bullets, omit section if none), 'Next steps' (bullets with owner + when). Close with offer to clarify. Sign off 'Best,'. Do not include placeholders like [Your name] — leave the signature blank for the user to fill. Plain text, no markdown headers in the email body itself (use bold + bullets only).",
+      "format": "paragraph"
+    },
+    {
+      "title": "To / CC suggestions",
+      "instruction": "List attendees by email (if known) split into 'To:' (active participants who owe a follow-up) and 'CC:' (observers / stakeholders).",
+      "format": "list"
+    }
+  ]
+}

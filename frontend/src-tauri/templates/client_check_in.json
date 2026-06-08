@@ -1,0 +1,32 @@
+{
+  "name": "Client check-in / account review",
+  "description": "Granola-style account meeting notes — status, asks, risks, next steps, internal notes.",
+  "sections": [
+    {
+      "title": "Client status update",
+      "instruction": "Summarize where the client is — what's working, what they're using, recent milestones. One paragraph.",
+      "format": "paragraph"
+    },
+    {
+      "title": "Client asks",
+      "instruction": "List every explicit ask the client made: features, fixes, info requests, escalations. Quote directly when wording matters.",
+      "format": "list"
+    },
+    {
+      "title": "Risks + churn signals",
+      "instruction": "Note frustration, competitor mentions, budget concerns, team changes, executive sponsor changes. If none, write 'None observed.'",
+      "format": "paragraph"
+    },
+    {
+      "title": "Next steps",
+      "instruction": "Concrete commitments made — owner + task + when. Separate our commitments from theirs.",
+      "format": "list",
+      "item_format": "| **Side** | **Owner** | Task | When |\n| --- | --- | --- | --- |"
+    },
+    {
+      "title": "Internal notes (don't share)",
+      "instruction": "Strategic context for our team: relationship temperature, expansion opportunities, account health score, who else to loop in. Keep concise.",
+      "format": "paragraph"
+    }
+  ]
+}
